@@ -29,7 +29,42 @@ class EmailAddress {
 // EmailAddress 型の値は「検証済み」であることが型で保証される。
 ```
 
-- 採用例: OkHttp（Request.Builder 等の Builder 群）。smart constructor は Rust 標準ライブラリの NonZeroU32::new（不正な値なら None を返し、生成経路を絞る）
+#### 採用例
+
+- OkHttp（Request.Builder 等の Builder 群）
+- Rust 標準ライブラリの NonZeroU32::new（smart constructor。不正な値なら None を返し、生成経路を絞る）
+
+実コード（OkHttp の Request.Builder）: ファイルは okhttp/src/commonJvmAndroid/kotlin/okhttp3/Request.kt で、194〜396行が Builder の実装範囲。https://deepwiki.com/square/okhttp/2-core-http-client。抜粋は同ファイルのソース再掲（5.0.0-alpha.10）で確認した。
+
+```kotlin
+open class Builder {
+    internal var url: HttpUrlRepresentation?
+    internal var method: String
+    internal var headers: Headers.Builder
+    internal var body: RequestBody?
+    internal constructor(request: Request)
+    open fun url(url: HttpUrl): Builder
+    open fun url(url: String): Builder
+    open fun header(name: String, value: String): Builder
+    open fun method(method: String, body: RequestBody?): Builder
+    open fun build(): Request
+}
+```
+
+実コード（Rust 標準ライブラリの NonZero::new）: https://doc.rust-lang.org/nightly/src/core/num/nonzero.rs.html（new は496行目）。
+
+```rust
+/// Creates a non-zero if the given value is not zero.
+#[stable(feature = "nonzero", since = "1.28.0")]
+#[rustc_const_stable(feature = "const_nonzero_int_methods", since = "1.47.0")]
+#[must_use]
+#[inline]
+pub const fn new(n: T) -> Option<Self> {
+    // SAFETY: Memory layout optimization guarantees that `Option<NonZero<T>>` has
+    //         the same layout and size as `T`, with `0` representing `None`.
+    unsafe { intrinsics::transmute_unchecked(n) }
+}
+```
 
 ### Factory / DI
 
@@ -47,7 +82,26 @@ const createLogger = (env: "dev" | "prod"): Logger =>
 const run = (logger: Logger) => logger.log("start");
 ```
 
-- 採用例: Spring Framework の DI コンテナ、Angular（DI を前提にした framework 設計）
+#### 採用例
+
+- Spring Framework の DI コンテナ
+- Angular（DI を前提にした framework 設計）
+
+実コード（Spring Framework の BeanFactory）: https://docs.spring.io/spring-framework/docs/6.2.0-RC2/javadoc-api/org/springframework/beans/factory/BeanFactory.html。ソースファイルは spring-beans/src/main/java/org/springframework/beans/factory/BeanFactory.java。
+
+```java
+/**
+ * The root interface for accessing a Spring bean container.
+ * This is the basic client view of a bean container;
+ */
+public interface BeanFactory {
+
+    String FACTORY_BEAN_PREFIX = "&";
+
+    Object getBean(String name) throws BeansException;
+    // ...
+}
+```
 
 ### Singleton の代替
 
@@ -58,7 +112,18 @@ const run = (logger: Logger) => logger.log("start");
 export const config = loadConfig(); // import した全員が同じ1つを共有する
 ```
 
-- 採用例: Prisma Client を globalThis に載せて再利用する構成（Prisma 公式ドキュメントが開発時の多重生成防止として推奨）
+#### 採用例
+
+- Prisma Client を globalThis に載せて再利用する構成（Prisma 公式ドキュメントが開発時の多重生成防止として推奨）
+
+実コード（Prisma 公式ドキュメントのスニペット、そのまま）: https://www.prisma.io/docs/orm/v7/more/troubleshooting/nextjs
+
+```ts
+import { PrismaClient } from "../prisma/generated/client";
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
 
 ## 状態と振る舞い
 
@@ -85,7 +150,28 @@ const next = (s: State, ev: "start" | "finish"): State => {
 // 状態ごとに持てるデータが違うことを、型で表現できる
 ```
 
-- 採用例: XState（状態機械ライブラリ）、Erlang/OTP の gen_statem behaviour
+#### 採用例
+
+- XState（状態機械ライブラリ）
+- Erlang/OTP の gen_statem behaviour
+
+実コード（Erlang/OTP の gen_statem の使用例）: 公式 OTP Design Principles の code_lock 例。状態名と同名のコールバックがイベントを処理し、{next_state, 次状態, 新Data} を返して遷移を宣言する。
+
+```erlang
+locked(cast, {button,Digit},
+       #{code := Code, remaining := Remaining} = Data) ->
+    case Remaining of
+        [Digit] ->
+            do_unlock(),
+            {next_state,open,Data#{remaining := Code},10000};
+        [Digit|Rest] -> % Incomplete
+            {next_state,locked,Data#{remaining := Rest}};
+        _Wrong ->
+            {next_state,locked,Data#{remaining := Code}}
+    end.
+```
+
+本体は lib/stdlib/src/gen_statem.erl。https://github.com/erlang/otp/blob/maint/lib/stdlib/src/gen_statem.erl#L217
 
 ### Strategy（高階関数）
 
@@ -101,7 +187,26 @@ const checkout = (price: number, pricing: Pricing) => pricing(price);
 checkout(1000, member); // 900
 ```
 
-- 採用例: Passport.js（認証方式そのものを Strategy として差し替える設計で、名称も Strategy）。Java の Comparator も同型
+#### 採用例
+
+- Passport.js（認証方式そのものを Strategy として差し替える設計で、名称も Strategy）
+- Java の Comparator
+
+実コード（passport-strategy の README にあるサブクラス化の定型）: https://github.com/jaredhanson/passport-strategy
+
+```js
+var util = require('util')
+  , Strategy = require('passport-strategy');
+
+function CustomStrategy(...) {
+  Strategy.call(this);
+}
+util.inherits(CustomStrategy, Strategy);
+
+CustomStrategy.prototype.authenticate = function(req, options) {
+  // TODO: authenticate request
+}
+```
 
 ### Command
 
@@ -121,7 +226,12 @@ const execute = (c: Command) => { c.do(); history.push(c); };
 const undo = () => history.pop()?.undo();
 ```
 
-- 採用例: VS Code の Commands（ID で登録し、キーバインドや他の拡張から実行できる）。Redux の action はシリアライズ可能な Command とみなせる
+#### 採用例
+
+- VS Code の Commands（ID で登録し、キーバインドや他の拡張から実行できる）
+- Redux の action（シリアライズ可能な Command とみなせる）
+
+定義ファイルは src/vs/platform/commands/common/commands.ts（CommandsRegistry）。
 
 ### Observer / signals
 
@@ -144,7 +254,19 @@ count.subscribe((v) => console.log("count =", v));
 count.set(1); // count = 1
 ```
 
-- 採用例: RxJS（Observable）、SolidJS の signals（Observer の細粒度化）
+#### 採用例
+
+- RxJS（Observable）
+- SolidJS の signals（Observer の細粒度化）
+
+実コード（SolidJS の createSignal）: 本体は packages/solid/src/reactive/signal.ts の227〜261行、Signal 型は198行（https://deepwiki.com/solidjs/solid/3.1-signals-and-derived-state による）。抜粋はシグネチャのみ。
+
+```ts
+export function createSignal<T>(
+  value?: T,
+  options?: SignalOptions<T | undefined>
+): Signal<T | undefined>
+```
 
 ## 構造
 
@@ -161,7 +283,20 @@ const adapt = (old: OldPrinter): Printer => ({
 });
 ```
 
-- 採用例: Java の Arrays.asList（配列を List のインターフェースで見せる）
+#### 採用例
+
+- Java の Arrays.asList（配列を List のインターフェースで見せる）
+
+実コード（OpenJDK の java.util.Arrays.asList）: https://cr.openjdk.org/~plevart/misc/valhala-hacks/javany-webrev.01/raw_files/new/src/java.base/share/classes/java/util/Arrays.java。GitHub 上のパスは src/java.base/share/classes/java/util/Arrays.java。
+
+```java
+public static <T> List<T> asList(T... a) {
+    return new ArrayList<>(a);
+}
+
+private static class ArrayList<E> extends AbstractList<E>
+        implements RandomAccess, java.io.Serializable {
+```
 
 ### Decorator / middleware
 
@@ -192,7 +327,28 @@ const app2 = pipe((req) => "ok", withLog, withAuth);
 // withLog(withAuth(base)) と等価
 ```
 
-- 採用例: Koa の middleware（onion model と呼ばれる合成）。Java I/O の BufferedInputStream 等のラッパーも同型
+#### 採用例
+
+- Koa の middleware（onion model と呼ばれる合成）
+- Java I/O の BufferedInputStream 等のラッパー
+
+実コード（koa-compose の dispatch）: 現行版の compose は index.js の30〜73行（https://deepwiki.com/koajs/compose/2.1-compose() による）。以下の抜粋は古典版のもので、現行版は async 化と検証追加により構造が異なる。
+
+```js
+return function (context, next) {
+  let index = -1
+  return dispatch(0)
+  function dispatch (i) {
+    if (i <= index) return Promise.reject(new Error('next() called multiple times'))
+    index = i
+    let fn = middleware[i]
+    if (i === middleware.length) fn = next
+    if (!fn) return Promise.resolve()
+    try {
+      return Promise.resolve(fn(context, function next () {
+        return dispatch(i + 1)
+      }))
+```
 
 ### Composite
 
@@ -214,7 +370,30 @@ const root = dir("root", [file("a.txt", 100), dir("sub", [file("b.txt", 50)])]);
 root.size(); // 150。枝も葉も同じ size() で再帰的に合計される
 ```
 
-- 採用例: DOM の Element ツリー、コンパイラの AST（TypeScript Compiler 等）
+#### 採用例
+
+- DOM の Element ツリー
+- コンパイラの AST（TypeScript Compiler 等）
+
+実コード（TypeScript Compiler の SyntaxKind）: https://github.com/microsoft/TypeScript/blob/1294ee8c1f37c8bf214db67e180edb3220a52236/src/compiler/types.ts#L21。SyntaxKind 列挙体は同ファイルの40〜492行（DeepWiki の索引による）。
+
+```
+// Contextual keywords
+AbstractKeyword,
+AsKeyword,
+AssertsKeyword,
+AnyKeyword,
+AwaitKeyword,
+BooleanKeyword,
+ConstructorKeyword,
+DeclareKeyword,
+InferKeyword,
+KeyOfKeyword,
+NamespaceKeyword,
+NeverKeyword,
+```
+
+全 AST ノードは共通基底 Node（kind: SyntaxKind を持つ）に従う。
 
 ## データ・並行・分散
 
@@ -234,7 +413,19 @@ const balance = (events: Event[]) =>
 // 書き込みは「イベントを追記するだけ」、読み取りは「再構成した値」で分離するのが CQRS
 ```
 
-- 採用例: EventStoreDB（イベントストア専用 DB）、Axon Framework（Java の CQRS / Event Sourcing 基盤）
+#### 採用例
+
+- EventStoreDB（イベントストア専用 DB）
+- Axon Framework（Java の CQRS / Event Sourcing 基盤）
+
+実コード（Axon Framework の利用例、DZone の実装記事より）: 核は AggregateLifecycle.apply で、集約のコマンドハンドラの中からイベントを発行する。
+
+```java
+public AccountAggregate(CreateAccountCommand createAccountCommand) {
+    AggregateLifecycle.apply(new AccountCreatedEvent(
+        createAccountCommand.id, createAccountCommand.accountBalance, createAccountCommand.currency));
+}
+```
 
 ### Durable Execution
 
@@ -250,7 +441,27 @@ async function orderWorkflow(orderId: string) {
 }
 ```
 
-- 採用例: Temporal、AWS Step Functions
+#### 採用例
+
+- Temporal
+- AWS Step Functions
+
+実コード（Temporal 公式サンプル、samples-typescript の child-workflows）: https://github.com/temporalio/samples-typescript/blob/main/child-workflows/src/workflows.ts（GitHub のファイルページを開いて確認済み）。
+
+```ts
+import { executeChild } from '@temporalio/workflow';
+
+export async function parentWorkflow(...names: string[]): Promise<string> {
+  const responseArray = await Promise.all(
+    names.map((name) =>
+      executeChild(childWorkflow, {
+        args: [name],
+      }),
+    ),
+  );
+  return responseArray.join('\n');
+}
+```
 
 ### Actor
 
@@ -266,7 +477,22 @@ end
 # プロセスが1つずつメッセージを処理するため、ロックなしで競合が起きない
 ```
 
-- 採用例: WhatsApp のバックエンド（Erlang/OTP）、Microsoft Orleans（Halo シリーズのバックエンドで使われた仮想 Actor）
+#### 採用例
+
+- WhatsApp のバックエンド（Erlang/OTP）
+- Microsoft Orleans（Halo シリーズのバックエンドで使われた仮想 Actor）
+
+実コード（Erlang/OTP の gen_server 本体）: https://github.com/erlang/otp/blob/master/lib/stdlib/src/gen_server.erl（GitHub のファイルページを開いて確認済み）。抜粋は、コールバック関数の契約を型仕様として固定している箇所。
+
+```erlang
+handle_call :: fun((Request :: term(), From :: from(), State :: term()) ->
+                       {reply, Reply :: term(), NewState :: term()} |
+                       {reply, Reply :: term(), NewState :: term(), Action :: action()} |
+                       {noreply, NewState :: term()} |
+                       {noreply, NewState :: term(), action()} |
+                       {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
+                       {stop, Reason :: term(), NewState :: term()}),
+```
 
 ### CRDT（G-Counter）
 
@@ -288,7 +514,13 @@ const value = (c: GCounter) => Object.values(c).reduce((x, y) => x + y, 0);
 // merge は交換・結合・冪等なので、どの順序で同期しても同じ結果になる
 ```
 
-- 採用例: Yjs、Automerge（CRDT ライブラリ）。Figma のマルチプレイヤーは CRDT に着想を得た独自実装を技術ブログで公表している
+#### 採用例
+
+- Yjs（CRDT ライブラリ）
+- Automerge（CRDT ライブラリ）
+- Figma のマルチプレイヤー（CRDT に着想を得た独自実装を技術ブログで公表している）
+
+注記: Yjs の実装ファイルは src/types/YMap.js（YMap クラス）と src/types/YArray.js で、特定は https://deepwiki.com/yjs/yjs/3.6-events-and-observation による。
 
 ### 楽観的ロック
 
@@ -310,7 +542,28 @@ const save = async (doc: { id: string; version: number; body: string }) => {
 };
 ```
 
-- 採用例: Hibernate / JPA の @Version、HTTP の ETag と If-Match による条件付きリクエスト
+#### 採用例
+
+- Hibernate / JPA の @Version
+- HTTP の ETag と If-Match による条件付きリクエスト
+- Rails ActiveRecord の locking 実装
+
+実コード（ActiveRecord の楽観的ロック実装）: https://github.com/rails/rails/blob/d0dcb8fa6073a0c4d42600c15e82e3bb386b27d3/activerecord/lib/active_record/locking/optimistic.rb（GitHub のファイルページを開いて確認済み）。更新時に lock_version を +1 し、旧バージョンを条件に含めて更新して、影響行数が1でなければ StaleObjectError を投げる。
+
+```ruby
+def _update_row(attribute_names, attempted_action = "update")
+  return super unless locking_enabled?
+
+  locking_column = self.class.locking_column
+  lock_attribute_was = @attributes[locking_column]
+  update_constraints = _query_constraints_hash
+  attribute_names << locking_column
+  self[locking_column] += 1
+  affected_rows = self.class._update_record(attributes_with_values(attribute_names), update_constraints)
+
+  if affected_rows != 1
+    raise ActiveRecord::StaleObjectError.new(self, attempted_action)
+```
 
 ## 言語に組み込まれたもの
 
@@ -327,7 +580,19 @@ for (const p of pages(95, 10)) {
 }
 ```
 
-- 採用例: Python の iterator protocol、Rust 標準ライブラリの Iterator trait
+#### 採用例
+
+- Python の iterator protocol
+- Rust 標準ライブラリの Iterator trait
+
+実コード（Rust 標準ライブラリの Iterator trait）: https://doc.rust-lang.org/1.83.0/src/core/iter/traits/iterator.rs.html。
+
+```rust
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+```
 
 ### 後片付けの保証
 
@@ -346,7 +611,19 @@ const openFile = (path: string) => ({
 // 同じ役割: C++/Rust の RAII、Java の try-with-resources、C# の using、Go の defer
 ```
 
-- 採用例: Rust の Drop trait、C++ 標準ライブラリの std::unique_ptr / std::lock_guard（RAII）
+#### 採用例
+
+- Rust の Drop trait
+- C++ 標準ライブラリの std::unique_ptr / std::lock_guard（RAII）
+
+実コード（Rust 標準ライブラリの Drop trait）: https://doc.rust-lang.org/beta/src/core/ops/drop.rs.html。
+
+```rust
+#[lang = "drop"]
+pub trait Drop {
+    fn drop(&mut self);
+}
+```
 
 ### Option / null 安全
 
@@ -361,7 +638,20 @@ const u = findUser("1");
 if (u !== undefined) u.name; // この中では User として使える
 ```
 
-- 採用例: Haskell の Maybe（起源）、Rust の Option、Swift の Optional
+#### 採用例
+
+- Haskell の Maybe（起源）
+- Rust の Option
+- Swift の Optional
+
+実コード（Rust 標準ライブラリの Option）: https://doc.rust-lang.org/1.86.0/src/core/option.rs.html。
+
+```rust
+pub enum Option<T> {
+    None,
+    Some(T),
+}
+```
 
 ### パターンマッチング
 
@@ -385,7 +675,20 @@ const area = (s: Shape): number => {
 // Rust、Swift、Python 3.10、Java の switch では match として言語組み込み
 ```
 
-- 採用例: Rust の match、Elixir の関数頭部でのパターンマッチ
+#### 採用例
+
+- Rust の match
+- Elixir の関数頭部でのパターンマッチ
+
+実コード（Elixir 公式コードのモジュールドキュメント内にある例）: https://github.com/elixir-lang/elixir/blob/92e1830bf7548684462be5ce14083dea551b9811/lib/elixir/lib/kernel.ex（GitHub のファイルページを開いて確認済み）。構造体パターンで age を取り出し、when ガードで条件を付ける典型形。
+
+```elixir
+def drive(%User{age: age}) when age >= 16 do
+  ...
+end
+```
+
+注記: パターンマッチングは言語機能のため、代表箇所の一箇所特定は困難。これは公式コード自身が示す典型形である。
 
 ### async / await
 
@@ -399,7 +702,23 @@ const load = async (id: string) => {
 };
 ```
 
-- 採用例: C# / .NET（async/await を最初に言語へ導入した系統）、Rust の Tokio ランタイム
+#### 採用例
+
+- C# / .NET（async/await を最初に言語へ導入した系統）
+- Rust の Tokio ランタイム
+
+実コード（Tokio の runtime ドキュメント例）: https://openrr.github.io/openrr/src/tokio/runtime/mod.rs.html で確認した、#[tokio::main] と spawn の形。
+
+```rust
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ...
+    tokio::spawn(async move {
+        let mut buf = [0; 1024];
+        // ...
+    });
+}
+```
 
 ### trait / protocol 的な合成
 
@@ -413,4 +732,16 @@ type Movable = { move(x: number, y: number): void };
 const sprite = (d: Drawable, m: Movable): Drawable & Movable => ({ ...d, ...m });
 ```
 
-- 採用例: Rust 標準ライブラリの trait 群（Iterator、From / Into 等）、Swift の protocol
+#### 採用例
+
+- Rust 標準ライブラリの trait 群（Iterator、From / Into 等）
+- Swift の protocol
+
+実コード（Rust 標準ライブラリの From trait）: https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html（588〜594行）。From を実装すると、同ファイルのブランケット実装により Into が自動で得られる（trait 合成の核）。
+
+```rust
+pub const trait From<T>: Sized {
+    /// Converts to this type from the input type.
+    fn from(value: T) -> Self;
+}
+```
