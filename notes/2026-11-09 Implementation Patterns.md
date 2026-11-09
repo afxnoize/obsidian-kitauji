@@ -1,14 +1,21 @@
+---
+作成: Muse（パーソナルエージェント、Riri）
+モデル: Muse Spark 1.3
+作成日: 2026-11-09
+---
 # パターン実装例集
 
 ケースごとに「どう実装するとよいか」を短いコードで示す。言語は TypeScript を基本とし、そのパターンの本家である言語が明確なものはその言語で書く。
 
-## 環境
+各パターンは、ケース、実装例、採用例の順に並ぶ。採用例は1件ごとに見出しを立て、リンクとコード本体を分けて載せる。
 
-### Muse
-
-- 作成: Muse（パーソナルエージェント、Riri）
-- モデル: Muse Spark 1.3
-- 作成日: 2026年11月9日
+> [!note] 採用例のコードについて
+> - コードは一次ソース（リポジトリまたは公式ドキュメント）から転記した。取得日は 2026-11-09。
+> - `#L` 付きのリンクは、タグまたはコミットで固定している。ブランチ名だけのリンクは、あとで内容が変わりうるので行番号を付けていない。
+> - 省略した箇所は `// ...` で示した。インデントは詰めてある。
+> - コードを載せていない採用例は、リンクのみとした。
+> - 例外は Axon の利用例で、DZone の記事からの引用であり、原典の URL を確認できていない。
+> - 各採用例の「要点」は、元の文章のまま残している。事実の確認はしていない。
 
 ## 生成まわり
 
@@ -29,29 +36,43 @@ class EmailAddress {
 // EmailAddress 型の値は「検証済み」であることが型で保証される。
 ```
 
-#### 採用例
+#### 採用例: OkHttp（Request.Builder など Builder 群）
 
-- OkHttp（Request.Builder 等の Builder 群）
-- Rust 標準ライブラリの NonZeroU32::new（smart constructor。不正な値なら None を返し、生成経路を絞る）
-
-実コード（OkHttp の Request.Builder）: ファイルは okhttp/src/commonJvmAndroid/kotlin/okhttp3/Request.kt で、194〜396行が Builder の実装範囲。https://deepwiki.com/square/okhttp/2-core-http-client。抜粋は同ファイルのソース再掲（5.0.0-alpha.10）で確認した。
+- リンク: [okhttp3/Request.kt](https://github.com/square/okhttp/blob/master/okhttp/src/commonJvmAndroid/kotlin/okhttp3/Request.kt)
+- コード: master ブランチから転記
 
 ```kotlin
 open class Builder {
-    internal var url: HttpUrlRepresentation?
-    internal var method: String
-    internal var headers: Headers.Builder
-    internal var body: RequestBody?
-    internal constructor(request: Request)
-    open fun url(url: HttpUrl): Builder
-    open fun url(url: String): Builder
-    open fun header(name: String, value: String): Builder
-    open fun method(method: String, body: RequestBody?): Builder
-    open fun build(): Request
+  internal var url: HttpUrl? = null
+  internal var method: String
+  internal var headers: Headers.Builder
+  internal var body: RequestBody? = null
+  internal var cacheUrlOverride: HttpUrl? = null
+  internal var tags: Tags = EmptyTags
+
+  constructor() {
+    this.method = "GET"
+    this.headers = Headers.Builder()
+  }
+
+  // ...
+
+  open fun url(url: HttpUrl): Builder =
+    apply {
+      this.url = url
+    }
+
+  // ...
+
+  open fun build(): Request = Request(this)
 }
 ```
 
-実コード（Rust 標準ライブラリの NonZero::new）: https://doc.rust-lang.org/nightly/src/core/num/nonzero.rs.html（new は496行目）。
+#### 採用例: Rust 標準ライブラリの `NonZero<T>::new`
+
+- 要点: smart constructor。0 なら None を返し、生成経路を絞る。`NonZeroU32::new` は `T = u32` の場合。
+- リンク: [core/src/num/nonzero.rs（1.86.0）](https://github.com/rust-lang/rust/blob/1.86.0/library/core/src/num/nonzero.rs#L367-L376)
+- コード: タグ 1.86.0 から転記
 
 ```rust
 /// Creates a non-zero if the given value is not zero.
@@ -82,26 +103,35 @@ const createLogger = (env: "dev" | "prod"): Logger =>
 const run = (logger: Logger) => logger.log("start");
 ```
 
-#### 採用例
+#### 採用例: Spring Framework の DI コンテナ（BeanFactory）
 
-- Spring Framework の DI コンテナ
-- Angular（DI を前提にした framework 設計）
-
-実コード（Spring Framework の BeanFactory）: https://docs.spring.io/spring-framework/docs/6.2.0-RC2/javadoc-api/org/springframework/beans/factory/BeanFactory.html。ソースファイルは spring-beans/src/main/java/org/springframework/beans/factory/BeanFactory.java。
+- リンク: [BeanFactory.java](https://github.com/spring-projects/spring-framework/blob/main/spring-beans/src/main/java/org/springframework/beans/factory/BeanFactory.java)
+- コード: main ブランチから転記
 
 ```java
 /**
  * The root interface for accessing a Spring bean container.
- * This is the basic client view of a bean container;
+ *
+ * <p>This is the basic client view of a bean container;
+ * ...
  */
 public interface BeanFactory {
 
+    // ...
     String FACTORY_BEAN_PREFIX = "&";
 
+    // ...
     Object getBean(String name) throws BeansException;
+
     // ...
 }
 ```
+
+#### 採用例: Angular（DI を前提にした framework 設計）
+
+- リンク（ドキュメント）: [Angular の DI](https://angular.dev/guide/di)
+- リンク（ソース）: [packages/core/src/di/injector.ts](https://github.com/angular/angular/blob/main/packages/core/src/di/injector.ts)
+- コード: 掲載なし（リンクのみ）
 
 ### Singleton の代替
 
@@ -112,16 +142,20 @@ public interface BeanFactory {
 export const config = loadConfig(); // import した全員が同じ1つを共有する
 ```
 
-#### 採用例
+#### 採用例: Prisma Client を globalThis に載せて再利用する構成
 
-- Prisma Client を globalThis に載せて再利用する構成（Prisma 公式ドキュメントが開発時の多重生成防止として推奨）
-
-実コード（Prisma 公式ドキュメントのスニペット、そのまま）: https://www.prisma.io/docs/orm/v7/more/troubleshooting/nextjs
+- 要点: Prisma 公式ドキュメントが、開発時の多重生成を防ぐ方法として推奨している。Next.js のホットリロードで、モジュールが何度も読み直されることへの対策。
+- リンク: [Prisma Docs: Next.js のトラブルシューティング](https://www.prisma.io/docs/orm/v7/more/troubleshooting/nextjs)
+- コード: 公式ドキュメントのスニペットを原文のまま転記
 
 ```ts
+// lib/prisma.ts
 import { PrismaClient } from "../prisma/generated/client";
+
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
 export const prisma = globalForPrisma.prisma || new PrismaClient();
+
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ```
 
@@ -150,28 +184,44 @@ const next = (s: State, ev: "start" | "finish"): State => {
 // 状態ごとに持てるデータが違うことを、型で表現できる
 ```
 
-#### 採用例
+#### 採用例: XState（状態機械ライブラリ）
 
-- XState（状態機械ライブラリ）
-- Erlang/OTP の gen_statem behaviour
+- リンク: [packages/core/src/createMachine.ts](https://github.com/statelyai/xstate/blob/main/packages/core/src/createMachine.ts)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Erlang/OTP の gen_statem の使用例）: 公式 OTP Design Principles の code_lock 例。状態名と同名のコールバックがイベントを処理し、{next_state, 次状態, 新Data} を返して遷移を宣言する。
+#### 採用例: Erlang/OTP の gen_statem behaviour
+
+- 要点: 状態名と同名のコールバック関数がイベントを処理し、`{next_state, 次状態, 新Data}` を返して遷移を宣言する。
+- リンク（例）: [OTP Design Principles: gen_statem Behaviour](https://www.erlang.org/doc/system/statem.html)
+- リンク（本体）: [lib/stdlib/src/gen_statem.erl](https://github.com/erlang/otp/blob/maint/lib/stdlib/src/gen_statem.erl)
+- コード: 上記ドキュメントの code_lock 例から転記。`locked/3` と `open/3` の部分
 
 ```erlang
-locked(cast, {button,Digit},
-       #{code := Code, remaining := Remaining} = Data) ->
-    case Remaining of
-        [Digit] ->
+locked(
+  cast, {button,Button},
+  #{code := Code, length := Length, buttons := Buttons} = Data) ->
+    NewButtons =
+        if
+            length(Buttons) < Length ->
+                Buttons;
+            true ->
+                tl(Buttons)
+        end ++ [Button],
+    if
+        NewButtons =:= Code -> % Correct
             do_unlock(),
-            {next_state,open,Data#{remaining := Code},10000};
-        [Digit|Rest] -> % Incomplete
-            {next_state,locked,Data#{remaining := Rest}};
-        _Wrong ->
-            {next_state,locked,Data#{remaining := Code}}
+            {next_state, open, Data#{buttons := []},
+             [{state_timeout,10_000,lock}]}; % Time in milliseconds
+        true -> % Incomplete | Incorrect
+            {next_state, locked, Data#{buttons := NewButtons}}
     end.
-```
 
-本体は lib/stdlib/src/gen_statem.erl。https://github.com/erlang/otp/blob/maint/lib/stdlib/src/gen_statem.erl#L217
+open(state_timeout, lock,  Data) ->
+    do_lock(),
+    {next_state, locked, Data};
+open(cast, {button,_}, Data) ->
+    {next_state, open, Data}.
+```
 
 ### Strategy（高階関数）
 
@@ -187,12 +237,11 @@ const checkout = (price: number, pricing: Pricing) => pricing(price);
 checkout(1000, member); // 900
 ```
 
-#### 採用例
+#### 採用例: Passport.js
 
-- Passport.js（認証方式そのものを Strategy として差し替える設計で、名称も Strategy）
-- Java の Comparator
-
-実コード（passport-strategy の README にあるサブクラス化の定型）: https://github.com/jaredhanson/passport-strategy
+- 要点: 認証方式そのものを Strategy として差し替える設計で、名称も Strategy。
+- リンク: [jaredhanson/passport-strategy](https://github.com/jaredhanson/passport-strategy)
+- コード: README のサブクラス化の定型（master ブランチ）を、原文の2ブロックのまま転記
 
 ```js
 var util = require('util')
@@ -201,12 +250,20 @@ var util = require('util')
 function CustomStrategy(...) {
   Strategy.call(this);
 }
-util.inherits(CustomStrategy, Strategy);
 
+util.inherits(CustomStrategy, Strategy);
+```
+
+```js
 CustomStrategy.prototype.authenticate = function(req, options) {
   // TODO: authenticate request
 }
 ```
+
+#### 採用例: Java の Comparator
+
+- リンク: [java/util/Comparator.java](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/util/Comparator.java)
+- コード: 掲載なし（リンクのみ）
 
 ### Command
 
@@ -226,12 +283,18 @@ const execute = (c: Command) => { c.do(); history.push(c); };
 const undo = () => history.pop()?.undo();
 ```
 
-#### 採用例
+#### 採用例: VS Code の Commands
 
-- VS Code の Commands（ID で登録し、キーバインドや他の拡張から実行できる）
-- Redux の action（シリアライズ可能な Command とみなせる）
+- 要点: ID で登録し、キーバインドや他の拡張から実行できる。定義は `CommandsRegistry`。
+- リンク: [src/vs/platform/commands/common/commands.ts](https://github.com/microsoft/vscode/blob/main/src/vs/platform/commands/common/commands.ts)
+- コード: 掲載なし（リンクのみ）
 
-定義ファイルは src/vs/platform/commands/common/commands.ts（CommandsRegistry）。
+#### 採用例: Redux の action
+
+- 要点: シリアライズ可能な Command とみなせる。
+- リンク（ドキュメント）: [Redux Fundamentals: Concepts and Data Flow](https://redux.js.org/tutorials/fundamentals/part-2-concepts-data-flow)
+- リンク（リポジトリ）: [reduxjs/redux](https://github.com/reduxjs/redux)
+- コード: 掲載なし（リンクのみ）
 
 ### Observer / signals
 
@@ -254,18 +317,26 @@ count.subscribe((v) => console.log("count =", v));
 count.set(1); // count = 1
 ```
 
-#### 採用例
+#### 採用例: RxJS（Observable）
 
-- RxJS（Observable）
-- SolidJS の signals（Observer の細粒度化）
+- リンク: [src/internal/Observable.ts（7.x）](https://github.com/ReactiveX/rxjs/blob/7.x/src/internal/Observable.ts)
+- コード: 掲載なし（リンクのみ）
 
-実コード（SolidJS の createSignal）: 本体は packages/solid/src/reactive/signal.ts の227〜261行、Signal 型は198行（https://deepwiki.com/solidjs/solid/3.1-signals-and-derived-state による）。抜粋はシグネチャのみ。
+#### 採用例: SolidJS の signals
+
+- 要点: Observer の細粒度化。
+- リンク: [packages/solid/src/reactive/signal.ts](https://github.com/solidjs/solid/blob/main/packages/solid/src/reactive/signal.ts)
+- コード: main ブランチから、`createSignal` の宣言部分を転記
 
 ```ts
+export function createSignal<T>(): Signal<T | undefined>;
+export function createSignal<T>(value: T, options?: SignalOptions<T>): Signal<T>;
 export function createSignal<T>(
   value?: T,
   options?: SignalOptions<T | undefined>
-): Signal<T | undefined>
+): Signal<T | undefined> {
+  // ...
+}
 ```
 
 ## 構造
@@ -283,19 +354,34 @@ const adapt = (old: OldPrinter): Printer => ({
 });
 ```
 
-#### 採用例
+#### 採用例: Java の Arrays.asList
 
-- Java の Arrays.asList（配列を List のインターフェースで見せる）
-
-実コード（OpenJDK の java.util.Arrays.asList）: https://cr.openjdk.org/~plevart/misc/valhala-hacks/javany-webrev.01/raw_files/new/src/java.base/share/classes/java/util/Arrays.java。GitHub 上のパスは src/java.base/share/classes/java/util/Arrays.java。
+- 要点: 配列を List のインターフェースで見せる。
+- リンク: [java/util/Arrays.java](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/util/Arrays.java)
+- コード: master ブランチから転記
 
 ```java
+@SafeVarargs
+@SuppressWarnings("varargs")
 public static <T> List<T> asList(T... a) {
     return new ArrayList<>(a);
 }
 
+/**
+ * @serial include
+ */
 private static class ArrayList<E> extends AbstractList<E>
-        implements RandomAccess, java.io.Serializable {
+    implements RandomAccess, java.io.Serializable
+{
+    // ...
+    private final E[] a;
+
+    ArrayList(E[] array) {
+        a = Objects.requireNonNull(array);
+    }
+
+    // ...
+}
 ```
 
 ### Decorator / middleware
@@ -327,28 +413,29 @@ const app2 = pipe((req) => "ok", withLog, withAuth);
 // withLog(withAuth(base)) と等価
 ```
 
-#### 採用例
+#### 採用例: Koa の middleware
 
-- Koa の middleware（onion model と呼ばれる合成）
-- Java I/O の BufferedInputStream 等のラッパー
-
-実コード（koa-compose の dispatch）: 現行版の compose は index.js の30〜73行（https://deepwiki.com/koajs/compose/2.1-compose() による）。以下の抜粋は古典版のもので、現行版は async 化と検証追加により構造が異なる。
+- 要点: onion model と呼ばれる合成。
+- リンク: [koajs/compose の index.js](https://github.com/koajs/compose/blob/master/index.js)
+- コード: master ブランチの `composeSlim` を転記。同ファイルの `compose` は、`NODE_ENV` が production のときだけ `composeSlim` を返し、それ以外では `next()` の二重呼び出しなどの検査を足した実装を返す
 
 ```js
-return function (context, next) {
-  let index = -1
-  return dispatch(0)
-  function dispatch (i) {
-    if (i <= index) return Promise.reject(new Error('next() called multiple times'))
-    index = i
-    let fn = middleware[i]
-    if (i === middleware.length) fn = next
-    if (!fn) return Promise.resolve()
-    try {
-      return Promise.resolve(fn(context, function next () {
-        return dispatch(i + 1)
-      }))
+const composeSlim = (middleware) => async (ctx, next) => {
+  const dispatch = (i) => async () => {
+    const fn = i === middleware.length
+      ? next
+      : middleware[i]
+    if (!fn) return
+    return await fn(ctx, dispatch(i + 1))
+  }
+  return dispatch(0)()
+}
 ```
+
+#### 採用例: Java I/O の BufferedInputStream 等のラッパー
+
+- リンク: [java/io/BufferedInputStream.java](https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/io/BufferedInputStream.java)
+- コード: 掲載なし（リンクのみ）
 
 ### Composite
 
@@ -370,30 +457,44 @@ const root = dir("root", [file("a.txt", 100), dir("sub", [file("b.txt", 50)])]);
 root.size(); // 150。枝も葉も同じ size() で再帰的に合計される
 ```
 
-#### 採用例
+#### 採用例: DOM の Element ツリー
 
-- DOM の Element ツリー
-- コンパイラの AST（TypeScript Compiler 等）
+- リンク: [DOM Standard: Element](https://dom.spec.whatwg.org/#interface-element)
+- コード: 掲載なし（リンクのみ）
 
-実コード（TypeScript Compiler の SyntaxKind）: https://github.com/microsoft/TypeScript/blob/1294ee8c1f37c8bf214db67e180edb3220a52236/src/compiler/types.ts#L21。SyntaxKind 列挙体は同ファイルの40〜492行（DeepWiki の索引による）。
+#### 採用例: コンパイラの AST（TypeScript Compiler）
 
-```
+- 要点: 全 AST ノードは共通基底 `Node`（`kind: SyntaxKind` を持つ）に従う。
+- リンク（SyntaxKind）: [src/compiler/types.ts#L158-L172](https://github.com/microsoft/TypeScript/blob/1294ee8c1f37c8bf214db67e180edb3220a52236/src/compiler/types.ts#L158-L172)
+- リンク（Node）: [src/compiler/types.ts#L841-L843](https://github.com/microsoft/TypeScript/blob/1294ee8c1f37c8bf214db67e180edb3220a52236/src/compiler/types.ts#L841-L843)
+- コード: コミット 1294ee8 から転記
+
+```ts
+// SyntaxKind の途中
 // Contextual keywords
 AbstractKeyword,
 AsKeyword,
 AssertsKeyword,
 AnyKeyword,
+AsyncKeyword,
 AwaitKeyword,
 BooleanKeyword,
 ConstructorKeyword,
 DeclareKeyword,
+GetKeyword,
 InferKeyword,
+IntrinsicKeyword,
+IsKeyword,
 KeyOfKeyword,
-NamespaceKeyword,
-NeverKeyword,
 ```
 
-全 AST ノードは共通基底 Node（kind: SyntaxKind を持つ）に従う。
+```ts
+export interface Node extends ReadonlyTextRange {
+    readonly kind: SyntaxKind;
+    readonly flags: NodeFlags;
+    // ...
+}
+```
 
 ## データ・並行・分散
 
@@ -413,12 +514,26 @@ const balance = (events: Event[]) =>
 // 書き込みは「イベントを追記するだけ」、読み取りは「再構成した値」で分離するのが CQRS
 ```
 
-#### 採用例
+#### 採用例: EventStoreDB
 
-- EventStoreDB（イベントストア専用 DB）
-- Axon Framework（Java の CQRS / Event Sourcing 基盤）
+- 要点: イベントストア専用 DB。
+- リンク: [EventStore/EventStore](https://github.com/EventStore/EventStore)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Axon Framework の利用例、DZone の実装記事より）: 核は AggregateLifecycle.apply で、集約のコマンドハンドラの中からイベントを発行する。
+#### 採用例: Axon Framework
+
+- 要点: Java の CQRS / Event Sourcing 基盤。集約のコマンドハンドラの中から `AggregateLifecycle.apply` でイベントを発行する。
+- リンク（リポジトリ）: [AxonFramework/AxonFramework](https://github.com/AxonFramework/AxonFramework)
+- リンク（API の定義）: [AggregateLifecycle.java（axon-4.10.x）](https://github.com/AxonFramework/AxonFramework/blob/axon-4.10.x/modelling/src/main/java/org/axonframework/modelling/command/AggregateLifecycle.java)
+- コード（定義）: axon-4.10.x ブランチから転記
+
+```java
+public static ApplyMore apply(Object payload) {
+    return AggregateLifecycle.getInstance().doApply(payload, MetaData.emptyInstance());
+}
+```
+
+- コード（利用例）: DZone の実装記事からの引用。記事の URL は確認できていない
 
 ```java
 public AccountAggregate(CreateAccountCommand createAccountCommand) {
@@ -441,12 +556,10 @@ async function orderWorkflow(orderId: string) {
 }
 ```
 
-#### 採用例
+#### 採用例: Temporal
 
-- Temporal
-- AWS Step Functions
-
-実コード（Temporal 公式サンプル、samples-typescript の child-workflows）: https://github.com/temporalio/samples-typescript/blob/main/child-workflows/src/workflows.ts（GitHub のファイルページを開いて確認済み）。
+- リンク: [samples-typescript/child-workflows/src/workflows.ts](https://github.com/temporalio/samples-typescript/blob/main/child-workflows/src/workflows.ts)
+- コード: 公式サンプル（main ブランチ）の `parentWorkflow` を転記
 
 ```ts
 import { executeChild } from '@temporalio/workflow';
@@ -456,12 +569,21 @@ export async function parentWorkflow(...names: string[]): Promise<string> {
     names.map((name) =>
       executeChild(childWorkflow, {
         args: [name],
+        // workflowId, // add business-meaningful workflow id here
+        // // regular workflow options apply here, with two additions (defaults shown):
+        // cancellationType: ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+        // parentClosePolicy: ParentClosePolicy.PARENT_CLOSE_POLICY_TERMINATE
       }),
     ),
   );
   return responseArray.join('\n');
 }
 ```
+
+#### 採用例: AWS Step Functions
+
+- リンク: [AWS Step Functions とは](https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html)
+- コード: 掲載なし（マネージドサービスで、実装は公開されていない）
 
 ### Actor
 
@@ -477,12 +599,22 @@ end
 # プロセスが1つずつメッセージを処理するため、ロックなしで競合が起きない
 ```
 
-#### 採用例
+#### 採用例: WhatsApp のバックエンド（Erlang/OTP）
 
-- WhatsApp のバックエンド（Erlang/OTP）
-- Microsoft Orleans（Halo シリーズのバックエンドで使われた仮想 Actor）
+- リンク: [WhatsApp - Wikipedia](https://en.wikipedia.org/wiki/WhatsApp)（Erlang で書かれていることへの言及を確認した二次資料）
+- コード: 掲載なし（実装は公開されていない）
 
-実コード（Erlang/OTP の gen_server 本体）: https://github.com/erlang/otp/blob/master/lib/stdlib/src/gen_server.erl（GitHub のファイルページを開いて確認済み）。抜粋は、コールバック関数の契約を型仕様として固定している箇所。
+#### 採用例: Microsoft Orleans
+
+- 要点: Halo シリーズのバックエンドで使われた仮想 Actor。
+- リンク: [dotnet/orleans](https://github.com/dotnet/orleans)
+- コード: 掲載なし（リンクのみ）
+
+#### 採用例: Erlang/OTP の gen_server 本体
+
+- 要点: コールバック関数の契約を、型仕様として固定している箇所。
+- リンク: [lib/stdlib/src/gen_server.erl](https://github.com/erlang/otp/blob/master/lib/stdlib/src/gen_server.erl)
+- コード: master ブランチから転記。`-record(server_data, ...)` の内側にある `handle_call` のフィールド
 
 ```erlang
 handle_call :: fun((Request :: term(), From :: from(), State :: term()) ->
@@ -514,13 +646,26 @@ const value = (c: GCounter) => Object.values(c).reduce((x, y) => x + y, 0);
 // merge は交換・結合・冪等なので、どの順序で同期しても同じ結果になる
 ```
 
-#### 採用例
+#### 採用例: Yjs（CRDT ライブラリ）
 
-- Yjs（CRDT ライブラリ）
-- Automerge（CRDT ライブラリ）
-- Figma のマルチプレイヤー（CRDT に着想を得た独自実装を技術ブログで公表している）
+- 要点: 実装ファイルは `src/types/YMap.js`（YMap クラス）と `src/types/YArray.js`。
+- リンク（YMap）: [src/types/YMap.js（v13.6.33）](https://github.com/yjs/yjs/blob/v13.6.33/src/types/YMap.js)
+- リンク（YArray）: [src/types/YArray.js（v13.6.33）](https://github.com/yjs/yjs/blob/v13.6.33/src/types/YArray.js)
+- コード: 掲載なし（リンクのみ）
 
-注記: Yjs の実装ファイルは src/types/YMap.js（YMap クラス）と src/types/YArray.js で、特定は https://deepwiki.com/yjs/yjs/3.6-events-and-observation による。
+> [!note] Yjs のリンクについて
+> main ブランチでは、上記のパスが 404 だった。そのためタグ v13.6.33 に固定した。
+
+#### 採用例: Automerge（CRDT ライブラリ）
+
+- リンク: [automerge/automerge](https://github.com/automerge/automerge)
+- コード: 掲載なし（リンクのみ）
+
+#### 採用例: Figma のマルチプレイヤー
+
+- 要点: CRDT に着想を得た独自実装を、技術ブログで公表している。
+- リンク: [How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)
+- コード: 掲載なし（実装は公開されていない）
 
 ### 楽観的ロック
 
@@ -542,27 +687,51 @@ const save = async (doc: { id: string; version: number; body: string }) => {
 };
 ```
 
-#### 採用例
+#### 採用例: Hibernate / JPA の @Version
 
-- Hibernate / JPA の @Version
-- HTTP の ETag と If-Match による条件付きリクエスト
-- Rails ActiveRecord の locking 実装
+- リンク: [jakarta.persistence.Version](https://github.com/jakartaee/persistence/blob/master/api/src/main/java/jakarta/persistence/Version.java)（JPA 側の注釈の定義）
+- コード: 掲載なし（リンクのみ）
 
-実コード（ActiveRecord の楽観的ロック実装）: https://github.com/rails/rails/blob/d0dcb8fa6073a0c4d42600c15e82e3bb386b27d3/activerecord/lib/active_record/locking/optimistic.rb（GitHub のファイルページを開いて確認済み）。更新時に lock_version を +1 し、旧バージョンを条件に含めて更新して、影響行数が1でなければ StaleObjectError を投げる。
+#### 採用例: HTTP の ETag と If-Match による条件付きリクエスト
+
+- リンク: [RFC 9110: If-Match](https://www.rfc-editor.org/rfc/rfc9110#name-if-match)
+- コード: 掲載なし（仕様書のため）
+
+#### 採用例: Rails ActiveRecord の locking 実装
+
+- 要点: 更新時に `lock_version` を +1 し、旧バージョンを条件に含めて更新する。影響行数が1でなければ `StaleObjectError` を投げる。
+- リンク: [activerecord/lib/active_record/locking/optimistic.rb#L92-L118](https://github.com/rails/rails/blob/d0dcb8fa6073a0c4d42600c15e82e3bb386b27d3/activerecord/lib/active_record/locking/optimistic.rb#L92-L118)
+- コード: コミット d0dcb8f から転記
 
 ```ruby
 def _update_row(attribute_names, attempted_action = "update")
   return super unless locking_enabled?
 
-  locking_column = self.class.locking_column
-  lock_attribute_was = @attributes[locking_column]
-  update_constraints = _query_constraints_hash
-  attribute_names << locking_column
-  self[locking_column] += 1
-  affected_rows = self.class._update_record(attributes_with_values(attribute_names), update_constraints)
+  begin
+    locking_column = self.class.locking_column
+    lock_attribute_was = @attributes[locking_column]
 
-  if affected_rows != 1
-    raise ActiveRecord::StaleObjectError.new(self, attempted_action)
+    update_constraints = _query_constraints_hash
+
+    attribute_names = attribute_names.dup if attribute_names.frozen?
+    attribute_names << locking_column
+
+    self[locking_column] += 1
+
+    affected_rows = self.class._update_record(
+      attributes_with_values(attribute_names),
+      update_constraints
+    )
+
+    if affected_rows != 1
+      raise ActiveRecord::StaleObjectError.new(self, attempted_action)
+    end
+
+    affected_rows
+
+  # If something went wrong, revert the locking_column value.
+  rescue Exception
+    # ...
 ```
 
 ## 言語に組み込まれたもの
@@ -580,17 +749,30 @@ for (const p of pages(95, 10)) {
 }
 ```
 
-#### 採用例
+#### 採用例: Python の iterator protocol
 
-- Python の iterator protocol
-- Rust 標準ライブラリの Iterator trait
+- リンク: [Python docs: Iterator Types](https://docs.python.org/3/library/stdtypes.html#iterator-types)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Rust 標準ライブラリの Iterator trait）: https://doc.rust-lang.org/1.83.0/src/core/iter/traits/iterator.rs.html。
+#### 採用例: Rust 標準ライブラリの Iterator trait
+
+- リンク: [core/src/iter/traits/iterator.rs#L39-L75（1.86.0）](https://github.com/rust-lang/rust/blob/1.86.0/library/core/src/iter/traits/iterator.rs#L39-L75)
+- コード: タグ 1.86.0 から転記
 
 ```rust
 pub trait Iterator {
+    /// The type of the elements being iterated over.
+    #[rustc_diagnostic_item = "IteratorItem"]
+    #[stable(feature = "rust1", since = "1.0.0")]
     type Item;
+
+    // ...
+
+    #[lang = "next"]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn next(&mut self) -> Option<Self::Item>;
+
+    // ...
 }
 ```
 
@@ -611,19 +793,28 @@ const openFile = (path: string) => ({
 // 同じ役割: C++/Rust の RAII、Java の try-with-resources、C# の using、Go の defer
 ```
 
-#### 採用例
+#### 採用例: Rust の Drop trait
 
-- Rust の Drop trait
-- C++ 標準ライブラリの std::unique_ptr / std::lock_guard（RAII）
-
-実コード（Rust 標準ライブラリの Drop trait）: https://doc.rust-lang.org/beta/src/core/ops/drop.rs.html。
+- リンク: [core/src/ops/drop.rs#L204-L242（1.86.0）](https://github.com/rust-lang/rust/blob/1.86.0/library/core/src/ops/drop.rs#L204-L242)
+- コード: タグ 1.86.0 から転記。doc コメントは省略
 
 ```rust
 #[lang = "drop"]
+#[stable(feature = "rust1", since = "1.0.0")]
+#[const_trait]
+#[rustc_const_unstable(feature = "const_destruct", issue = "133214")]
 pub trait Drop {
+    // ...
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn drop(&mut self);
 }
 ```
+
+#### 採用例: C++ 標準ライブラリの std::unique_ptr / std::lock_guard（RAII）
+
+- リンク（unique_ptr）: [cppreference: std::unique_ptr](https://en.cppreference.com/w/cpp/memory/unique_ptr)
+- リンク（lock_guard）: [cppreference: std::lock_guard](https://en.cppreference.com/w/cpp/thread/lock_guard)
+- コード: 掲載なし（リンクのみ）
 
 ### Option / null 安全
 
@@ -638,20 +829,34 @@ const u = findUser("1");
 if (u !== undefined) u.name; // この中では User として使える
 ```
 
-#### 採用例
+#### 採用例: Haskell の Maybe
 
-- Haskell の Maybe（起源）
-- Rust の Option
-- Swift の Optional
+- 要点: 起源。
+- リンク: [GHC.Maybe（base）](https://hackage.haskell.org/package/base/docs/GHC-Maybe.html)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Rust 標準ライブラリの Option）: https://doc.rust-lang.org/1.86.0/src/core/option.rs.html。
+#### 採用例: Rust の Option
+
+- リンク: [core/src/option.rs#L572-L581（1.86.0）](https://github.com/rust-lang/rust/blob/1.86.0/library/core/src/option.rs#L572-L581)
+- コード: タグ 1.86.0 から転記
 
 ```rust
 pub enum Option<T> {
+    /// No value.
+    #[lang = "None"]
+    #[stable(feature = "rust1", since = "1.0.0")]
     None,
-    Some(T),
+    /// Some value of type `T`.
+    #[lang = "Some"]
+    #[stable(feature = "rust1", since = "1.0.0")]
+    Some(#[stable(feature = "rust1", since = "1.0.0")] T),
 }
 ```
+
+#### 採用例: Swift の Optional
+
+- リンク: [stdlib/public/core/Optional.swift](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Optional.swift)
+- コード: 掲載なし（リンクのみ）
 
 ### パターンマッチング
 
@@ -675,12 +880,16 @@ const area = (s: Shape): number => {
 // Rust、Swift、Python 3.10、Java の switch では match として言語組み込み
 ```
 
-#### 採用例
+#### 採用例: Rust の match
 
-- Rust の match
-- Elixir の関数頭部でのパターンマッチ
+- リンク: [The Rust Programming Language: match 制御フロー](https://doc.rust-lang.org/book/ch06-02-match.html)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Elixir 公式コードのモジュールドキュメント内にある例）: https://github.com/elixir-lang/elixir/blob/92e1830bf7548684462be5ce14083dea551b9811/lib/elixir/lib/kernel.ex（GitHub のファイルページを開いて確認済み）。構造体パターンで age を取り出し、when ガードで条件を付ける典型形。
+#### 採用例: Elixir の関数頭部でのパターンマッチ
+
+- 要点: 構造体パターンで `age` を取り出し、`when` ガードで条件を付ける典型形。
+- リンク: [lib/elixir/lib/kernel.ex#L154-L156](https://github.com/elixir-lang/elixir/blob/92e1830bf7548684462be5ce14083dea551b9811/lib/elixir/lib/kernel.ex#L154-L156)
+- コード: コミット 92e1830 から転記。`Kernel` モジュールのドキュメント（Guards の節）にある例
 
 ```elixir
 def drive(%User{age: age}) when age >= 16 do
@@ -688,7 +897,8 @@ def drive(%User{age: age}) when age >= 16 do
 end
 ```
 
-注記: パターンマッチングは言語機能のため、代表箇所の一箇所特定は困難。これは公式コード自身が示す典型形である。
+> [!note] 注記
+> パターンマッチングは言語機能なので、代表箇所を1か所に特定するのは難しい。上のコードは、公式のドキュメント自身が示す典型形である。
 
 ### async / await
 
@@ -702,22 +912,32 @@ const load = async (id: string) => {
 };
 ```
 
-#### 採用例
+#### 採用例: C# / .NET
 
-- C# / .NET（async/await を最初に言語へ導入した系統）
-- Rust の Tokio ランタイム
+- 要点: async/await を最初に言語へ導入した系統。
+- リンク: [Microsoft Learn: C# の非同期プログラミング](https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/)
+- コード: 掲載なし（リンクのみ）
 
-実コード（Tokio の runtime ドキュメント例）: https://openrr.github.io/openrr/src/tokio/runtime/mod.rs.html で確認した、#[tokio::main] と spawn の形。
+#### 採用例: Rust の Tokio ランタイム
+
+- リンク: [tokio/src/runtime/mod.rs](https://github.com/tokio-rs/tokio/blob/master/tokio/src/runtime/mod.rs)
+- コード: master ブランチのモジュールドキュメント（`//!` コメント内の例）から転記。`//!` は外した
 
 ```rust
+use tokio::net::TcpListener;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // ...
-    tokio::spawn(async move {
-        let mut buf = [0; 1024];
-        // ...
-    });
-}
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+
+    loop {
+        let (mut socket, _) = listener.accept().await?;
+
+        tokio::spawn(async move {
+            let mut buf = [0; 1024];
+
+            // ...
 ```
 
 ### trait / protocol 的な合成
@@ -732,16 +952,23 @@ type Movable = { move(x: number, y: number): void };
 const sprite = (d: Drawable, m: Movable): Drawable & Movable => ({ ...d, ...m });
 ```
 
-#### 採用例
+#### 採用例: Rust 標準ライブラリの trait 群（Iterator、From / Into など）
 
-- Rust 標準ライブラリの trait 群（Iterator、From / Into 等）
-- Swift の protocol
-
-実コード（Rust 標準ライブラリの From trait）: https://doc.rust-lang.org/nightly/src/core/convert/mod.rs.html（588〜594行）。From を実装すると、同ファイルのブランケット実装により Into が自動で得られる（trait 合成の核）。
+- 要点: `From` を実装すると、同ファイルのブランケット実装（`impl<T, U> Into<U> for T where U: From<T>`）により `Into` が自動で得られる。trait 合成の核。
+- リンク: [core/src/convert/mod.rs#L582-L588（1.86.0）](https://github.com/rust-lang/rust/blob/1.86.0/library/core/src/convert/mod.rs#L582-L588)
+- コード: タグ 1.86.0 から `From` の定義を転記
 
 ```rust
-pub const trait From<T>: Sized {
+pub trait From<T>: Sized {
     /// Converts to this type from the input type.
+    #[rustc_diagnostic_item = "from_fn"]
+    #[must_use]
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn from(value: T) -> Self;
 }
 ```
+
+#### 採用例: Swift の protocol
+
+- リンク: [The Swift Programming Language: Protocols](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/protocols/)
+- コード: 掲載なし（リンクのみ）
