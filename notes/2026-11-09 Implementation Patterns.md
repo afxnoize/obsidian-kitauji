@@ -1,7 +1,8 @@
 # パターン実装例集
 
 ケースごとに「どう実装するとよいか」を短いコードで示す。言語は TypeScript を基本とし、そのパターンの本家である言語が明確なものはその言語で書く。
-## 前提環境
+
+## 環境
 
 ### Muse
 
@@ -28,6 +29,8 @@ class EmailAddress {
 // EmailAddress 型の値は「検証済み」であることが型で保証される。
 ```
 
+- 採用例: OkHttp（Request.Builder 等の Builder 群）。smart constructor は Rust 標準ライブラリの NonZeroU32::new（不正な値なら None を返し、生成経路を絞る）
+
 ### Factory / DI
 
 ケース: 生成方法を差し替えたい、テストで差し替えたい。
@@ -44,6 +47,8 @@ const createLogger = (env: "dev" | "prod"): Logger =>
 const run = (logger: Logger) => logger.log("start");
 ```
 
+- 採用例: Spring Framework の DI コンテナ、Angular（DI を前提にした framework 設計）
+
 ### Singleton の代替
 
 ケース: 全体で1つだけ共有したい。
@@ -52,6 +57,8 @@ const run = (logger: Logger) => logger.log("start");
 // クラスで管理せず、モジュールが1回だけ評価される性質を使う
 export const config = loadConfig(); // import した全員が同じ1つを共有する
 ```
+
+- 採用例: Prisma Client を globalThis に載せて再利用する構成（Prisma 公式ドキュメントが開発時の多重生成防止として推奨）
 
 ## 状態と振る舞い
 
@@ -78,6 +85,8 @@ const next = (s: State, ev: "start" | "finish"): State => {
 // 状態ごとに持てるデータが違うことを、型で表現できる
 ```
 
+- 採用例: XState（状態機械ライブラリ）、Erlang/OTP の gen_statem behaviour
+
 ### Strategy（高階関数）
 
 ケース: アルゴリズムを差し替えたい。
@@ -91,6 +100,8 @@ const member: Pricing = (p) => p * 0.9;
 const checkout = (price: number, pricing: Pricing) => pricing(price);
 checkout(1000, member); // 900
 ```
+
+- 採用例: Passport.js（認証方式そのものを Strategy として差し替える設計で、名称も Strategy）。Java の Comparator も同型
 
 ### Command
 
@@ -109,6 +120,8 @@ const history: Command[] = [];
 const execute = (c: Command) => { c.do(); history.push(c); };
 const undo = () => history.pop()?.undo();
 ```
+
+- 採用例: VS Code の Commands（ID で登録し、キーバインドや他の拡張から実行できる）。Redux の action はシリアライズ可能な Command とみなせる
 
 ### Observer / signals
 
@@ -131,6 +144,8 @@ count.subscribe((v) => console.log("count =", v));
 count.set(1); // count = 1
 ```
 
+- 採用例: RxJS（Observable）、SolidJS の signals（Observer の細粒度化）
+
 ## 構造
 
 ### Adapter
@@ -145,6 +160,8 @@ const adapt = (old: OldPrinter): Printer => ({
   print: (s) => old.printOld(s),
 });
 ```
+
+- 採用例: Java の Arrays.asList（配列を List のインターフェースで見せる）
 
 ### Decorator / middleware
 
@@ -174,6 +191,9 @@ const pipe = (base: Handler, ...wrappers: Wrapper[]): Handler =>
 const app2 = pipe((req) => "ok", withLog, withAuth);
 // withLog(withAuth(base)) と等価
 ```
+
+- 採用例: Koa の middleware（onion model と呼ばれる合成）。Java I/O の BufferedInputStream 等のラッパーも同型
+
 ### Composite
 
 ケース: 木構造の葉と枝を同じ操作で扱いたい。
@@ -194,6 +214,8 @@ const root = dir("root", [file("a.txt", 100), dir("sub", [file("b.txt", 50)])]);
 root.size(); // 150。枝も葉も同じ size() で再帰的に合計される
 ```
 
+- 採用例: DOM の Element ツリー、コンパイラの AST（TypeScript Compiler 等）
+
 ## データ・並行・分散
 
 ### Event Sourcing + CQRS
@@ -212,6 +234,8 @@ const balance = (events: Event[]) =>
 // 書き込みは「イベントを追記するだけ」、読み取りは「再構成した値」で分離するのが CQRS
 ```
 
+- 採用例: EventStoreDB（イベントストア専用 DB）、Axon Framework（Java の CQRS / Event Sourcing 基盤）
+
 ### Durable Execution
 
 ケース: 長い処理を途中で止めたい、障害で落ちても続きから再開したい。
@@ -226,6 +250,8 @@ async function orderWorkflow(orderId: string) {
 }
 ```
 
+- 採用例: Temporal、AWS Step Functions
+
 ### Actor
 
 ケース: 状態の競合を避けたい。状態はプロセスの中に閉じ、外からはメッセージでしか触れない。
@@ -239,6 +265,8 @@ defmodule Counter do
 end
 # プロセスが1つずつメッセージを処理するため、ロックなしで競合が起きない
 ```
+
+- 採用例: WhatsApp のバックエンド（Erlang/OTP）、Microsoft Orleans（Halo シリーズのバックエンドで使われた仮想 Actor）
 
 ### CRDT（G-Counter）
 
@@ -260,6 +288,8 @@ const value = (c: GCounter) => Object.values(c).reduce((x, y) => x + y, 0);
 // merge は交換・結合・冪等なので、どの順序で同期しても同じ結果になる
 ```
 
+- 採用例: Yjs、Automerge（CRDT ライブラリ）。Figma のマルチプレイヤーは CRDT に着想を得た独自実装を技術ブログで公表している
+
 ### 楽観的ロック
 
 ケース: 同時更新の衝突を、ロックせずに検出したい。
@@ -280,6 +310,8 @@ const save = async (doc: { id: string; version: number; body: string }) => {
 };
 ```
 
+- 採用例: Hibernate / JPA の @Version、HTTP の ETag と If-Match による条件付きリクエスト
+
 ## 言語に組み込まれたもの
 
 ### Iterator / generator
@@ -294,6 +326,8 @@ for (const p of pages(95, 10)) {
   /* 1..10 を1つずつ */
 }
 ```
+
+- 採用例: Python の iterator protocol、Rust 標準ライブラリの Iterator trait
 
 ### 後片付けの保証
 
@@ -312,6 +346,8 @@ const openFile = (path: string) => ({
 // 同じ役割: C++/Rust の RAII、Java の try-with-resources、C# の using、Go の defer
 ```
 
+- 採用例: Rust の Drop trait、C++ 標準ライブラリの std::unique_ptr / std::lock_guard（RAII）
+
 ### Option / null 安全
 
 ケース: 「値がない」ことを null でなく型で表したい。
@@ -324,6 +360,8 @@ const findUser = (id: string): User | undefined => users.get(id);
 const u = findUser("1");
 if (u !== undefined) u.name; // この中では User として使える
 ```
+
+- 採用例: Haskell の Maybe（起源）、Rust の Option、Swift の Optional
 
 ### パターンマッチング
 
@@ -347,6 +385,8 @@ const area = (s: Shape): number => {
 // Rust、Swift、Python 3.10、Java の switch では match として言語組み込み
 ```
 
+- 採用例: Rust の match、Elixir の関数頭部でのパターンマッチ
+
 ### async / await
 
 ケース: 非同期の連鎖を手続き的に書きたい。Promise の連鎖が構文になったもの。
@@ -359,6 +399,8 @@ const load = async (id: string) => {
 };
 ```
 
+- 採用例: C# / .NET（async/await を最初に言語へ導入した系統）、Rust の Tokio ランタイム
+
 ### trait / protocol 的な合成
 
 ケース: 継承でなく「能力の組み合わせ」で型を作りたい。
@@ -370,3 +412,5 @@ type Movable = { move(x: number, y: number): void };
 // 能力を持つ部品を合成して渡す。Rust の trait、Swift の protocol、Haskell の typeclass と同系統
 const sprite = (d: Drawable, m: Movable): Drawable & Movable => ({ ...d, ...m });
 ```
+
+- 採用例: Rust 標準ライブラリの trait 群（Iterator、From / Into 等）、Swift の protocol
