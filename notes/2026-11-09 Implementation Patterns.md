@@ -1,8 +1,13 @@
 ---
-作成: Muse（パーソナルエージェント、Riri）
-モデル: Muse Spark 1.3
-作成日: 2026-11-09
+author:
+  - Muse（パーソナルエージェント）
+  - Claude
+model:
+  - Muse Spark 1.3
+  - Claude Sonnet 5.5
+createdAt: 2026-11-09
 ---
+
 # パターン実装例集
 
 ケースごとに「どう実装するとよいか」を短いコードで示す。言語は TypeScript を基本とし、そのパターンの本家である言語が明確なものはその言語で書く。
